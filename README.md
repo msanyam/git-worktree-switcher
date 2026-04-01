@@ -4,7 +4,7 @@
 
 ## Demo
 
-![demo](demo.gif)
+<video src="demo.mp4" autoplay loop muted playsinline></video>
 
 ## Features
 
