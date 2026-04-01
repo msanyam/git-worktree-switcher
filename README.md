@@ -4,7 +4,7 @@
 
 ## Demo
 
-<video src="demo.mp4" autoplay loop muted playsinline></video>
+https://github.com/user-attachments/assets/36807d45-ed0e-4c13-b9d2-ee9779192a6a
 
 ## Features
 
