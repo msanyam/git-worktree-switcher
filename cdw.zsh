@@ -42,6 +42,20 @@ _cdw_cd() {
     cd "$worktree_path"
 }
 
+_cdw_confirm() {
+    local prompt=$1 char
+    printf '%s' "$prompt"
+    read -k 1 char
+    print ''
+    if [[ $char == $'\e' ]]; then
+        return 2
+    elif [[ $char == [yY] ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
 _cdw_delete() {
     local worktree_path=$1 main_path=$2 branch_name=$3
     if [[ $worktree_path == "$main_path" ]]; then
