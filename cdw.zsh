@@ -45,7 +45,7 @@ _cdw_cd() {
 _cdw_confirm() {
     local prompt=$1 char
     printf '%s' "$prompt"
-    read -k 1 char
+    read -sk 1 char
     print ''
     if [[ $char == $'\e' ]]; then
         return 2
@@ -134,7 +134,7 @@ _cdw_handlers=(
     bspace _cdw_delete
 )
 
-cdw() {
+_cdw_main() {
     _cdw_check_fzf || return 1
     _cdw_check_git || return 1
 
@@ -200,4 +200,13 @@ cdw() {
         (( handler_rc == 2 )) && continue
         return $handler_rc
     done
+}
+
+cdw() {
+    local _cdw_xt=0
+    [[ -o xtrace ]] && _cdw_xt=1 && set +x
+    _cdw_main "$@"
+    local rc=$?
+    (( _cdw_xt )) && set -x
+    return $rc
 }
