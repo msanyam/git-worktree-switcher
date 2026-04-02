@@ -142,9 +142,17 @@ cdw() {
     local worktree_path
     worktree_path=$(awk '{print $1}' <<< "$selected")
 
+    local branch_raw branch_name
+    branch_raw=$(awk '{print $3}' <<< "$selected")
+    if [[ $branch_raw == \(* || -z $branch_raw ]]; then
+        branch_name=''
+    else
+        branch_name=${branch_raw//[\[\]]/}
+    fi
+
     if [[ -z $key ]]; then
         _cdw_cd "$worktree_path"
     elif (( ${+_cdw_handlers[$key]} )); then
-        ${_cdw_handlers[$key]} "$worktree_path" "$main_path"
+        ${_cdw_handlers[$key]} "$worktree_path" "$main_path" "$branch_name"
     fi
 }
