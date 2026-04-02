@@ -1,0 +1,1 @@
+post_create=echo "No hook configured. Skipping repo setup."

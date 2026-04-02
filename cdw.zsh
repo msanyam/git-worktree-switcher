@@ -22,6 +22,17 @@ _cdw_read_hook() {
     print -r -- "${line#*=}"
 }
 
+_cdw_run_hook() {
+    local hook_cmd=$1 branch=$2 worktree_path=$3
+    [[ -z $hook_cmd ]] && return 0
+    local rc
+    CDW_BRANCH="$branch" CDW_WORKTREE_PATH="$worktree_path" eval "$hook_cmd"
+    rc=$?
+    if (( rc != 0 )); then
+        echo "cdw: post_create hook failed (exit $rc)"
+    fi
+}
+
 _cdw_cd() {
     local worktree_path=$1
     if [[ ! -d $worktree_path ]]; then
@@ -48,7 +59,7 @@ _cdw_delete() {
 
 _cdw_create() {
     local main_path=$1
-    local branch_name
+    local branch_name hook_cmd
     local branch_name="${GIT_BRANCH_PREFIX:+${GIT_BRANCH_PREFIX}}"
     vared -p "Branch name: " branch_name
     [[ -z $branch_name ]] && return 0
@@ -63,6 +74,8 @@ _cdw_create() {
         echo "cdw: could not cd into $derived_path"
         return 1
     fi
+    hook_cmd=$(_cdw_read_hook "$main_path")
+    _cdw_run_hook "$hook_cmd" "$branch_name" "$derived_path"
 }
 
 typeset -gA _cdw_handlers
