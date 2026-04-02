@@ -145,50 +145,59 @@ cdw() {
         return 1
     fi
 
-    local output key selected fzf_exit
-    output=$(
-        { printf '[+ new worktree]\n'; PATH="$_CDW_PATH" git worktree list; } \
-        | PATH="$_CDW_PATH" fzf \
-            --expect="${(kj:,:)_cdw_handlers}" \
-            --header='Enter: cd/create  ⌫: delete' \
-            --height=40% \
-            --reverse \
-            --no-info
-    )
-    fzf_exit=$?
+    while true; do
+        local output key selected fzf_exit
+        output=$(
+            { printf '[+ new worktree]\n'; PATH="$_CDW_PATH" git worktree list; } \
+            | PATH="$_CDW_PATH" fzf \
+                --expect="${(kj:,:)_cdw_handlers}" \
+                --header='Enter: cd/create  ⌫: delete' \
+                --height=40% \
+                --reverse \
+                --no-info
+        )
+        fzf_exit=$?
 
-    if (( fzf_exit == 1 || fzf_exit == 130 )); then
-        return 0
-    elif (( fzf_exit != 0 )); then
-        echo "cdw: fzf exited with error (code $fzf_exit)"
-        return 1
-    fi
+        if (( fzf_exit == 1 || fzf_exit == 130 )); then
+            return 0
+        elif (( fzf_exit != 0 )); then
+            echo "cdw: fzf exited with error (code $fzf_exit)"
+            return 1
+        fi
 
-    key=$(head -1 <<< "$output")
-    selected=$(tail -1 <<< "$output")
+        key=$(head -1 <<< "$output")
+        selected=$(tail -1 <<< "$output")
 
-    [[ -z $selected || $selected == "$key" ]] && return 0
+        [[ -z $selected || $selected == "$key" ]] && return 0
 
-    if [[ $selected == '[+ new worktree]' ]]; then
-        [[ $key == 'bspace' ]] && return 0
-        _cdw_create "$main_path"
-        return
-    fi
+        local handler_rc=0
 
-    local worktree_path
-    worktree_path=$(awk '{print $1}' <<< "$selected")
+        if [[ $selected == '[+ new worktree]' ]]; then
+            [[ $key == 'bspace' ]] && return 0
+            _cdw_create "$main_path"
+            handler_rc=$?
+        else
+            local worktree_path
+            worktree_path=$(awk '{print $1}' <<< "$selected")
 
-    local branch_raw branch_name
-    branch_raw=$(awk '{print $3}' <<< "$selected")
-    if [[ $branch_raw == \(* || -z $branch_raw ]]; then
-        branch_name=''
-    else
-        branch_name=${branch_raw//[\[\]]/}
-    fi
+            local branch_raw branch_name
+            branch_raw=$(awk '{print $3}' <<< "$selected")
+            if [[ $branch_raw == \(* || -z $branch_raw ]]; then
+                branch_name=''
+            else
+                branch_name=${branch_raw//[\[\]]/}
+            fi
 
-    if [[ -z $key ]]; then
-        _cdw_cd "$worktree_path"
-    elif (( ${+_cdw_handlers[$key]} )); then
-        ${_cdw_handlers[$key]} "$worktree_path" "$main_path" "$branch_name"
-    fi
+            if [[ -z $key ]]; then
+                _cdw_cd "$worktree_path"
+                handler_rc=$?
+            elif (( ${+_cdw_handlers[$key]} )); then
+                ${_cdw_handlers[$key]} "$worktree_path" "$main_path" "$branch_name"
+                handler_rc=$?
+            fi
+        fi
+
+        (( handler_rc == 2 )) && continue
+        return $handler_rc
+    done
 }
