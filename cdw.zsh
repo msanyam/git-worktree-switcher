@@ -61,7 +61,6 @@ _cdw_delete() {
     [[ $setting != delete && $setting != skip && $setting != ask ]] && setting=ask
     [[ $setting == skip ]] && return 0
     if [[ $setting == ask ]]; then
-        local confirm
         read -r "confirm?Also delete branch '$branch_name'? [y/N] "
         [[ ! $confirm =~ ^[Yy]$ ]] && return 0
     fi
