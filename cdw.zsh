@@ -43,7 +43,7 @@ _cdw_cd() {
 }
 
 _cdw_delete() {
-    local worktree_path=$1 main_path=$2
+    local worktree_path=$1 main_path=$2 branch_name=$3
     if [[ $worktree_path == "$main_path" ]]; then
         echo "cdw: cannot delete the main worktree"
         return 1
@@ -54,6 +54,22 @@ _cdw_delete() {
     if ! PATH="$_CDW_PATH" git worktree remove "$worktree_path"; then
         echo "cdw: worktree has uncommitted changes; remove manually with: git worktree remove --force $worktree_path"
         return 1
+    fi
+    [[ -z $branch_name ]] && return 0
+    local setting
+    setting=$(_cdw_read_rc_key "$main_path" "delete_branch") || setting=ask
+    [[ $setting != delete && $setting != skip && $setting != ask ]] && setting=ask
+    [[ $setting == skip ]] && return 0
+    if [[ $setting == ask ]]; then
+        local confirm
+        read -r "confirm?Also delete branch '$branch_name'? [y/N] "
+        [[ ! $confirm =~ ^[Yy]$ ]] && return 0
+    fi
+    if PATH="$_CDW_PATH" git branch -d "$branch_name" 2>/dev/null; then
+        echo "cdw: deleted branch '$branch_name'"
+    else
+        echo "cdw: could not delete branch '$branch_name'"
+        echo "cdw: to force-delete: git branch -D $branch_name"
     fi
 }
 
