@@ -70,9 +70,10 @@ _cdw_delete() {
         echo "cdw: cannot delete the main worktree"
         return 1
     fi
-    local confirm
-    read -r "confirm?Remove $worktree_path? [y/N] "
-    [[ ! $confirm =~ ^[Yy]$ ]] && return 0
+    _cdw_confirm "Remove $worktree_path? [y/N] "
+    local confirm_rc=$?
+    (( confirm_rc == 2 )) && return 2
+    (( confirm_rc != 0 )) && return 0
     if ! PATH="$_CDW_PATH" git worktree remove "$worktree_path"; then
         echo "cdw: worktree has uncommitted changes; remove manually with: git worktree remove --force $worktree_path"
         return 1
@@ -83,8 +84,10 @@ _cdw_delete() {
     [[ $setting != delete && $setting != skip && $setting != ask ]] && setting=ask
     [[ $setting == skip ]] && return 0
     if [[ $setting == ask ]]; then
-        read -r "confirm?Also delete branch '$branch_name'? [y/N] "
-        [[ ! $confirm =~ ^[Yy]$ ]] && return 0
+        _cdw_confirm "Also delete branch '$branch_name'? [y/N] "
+        local confirm_rc=$?
+        (( confirm_rc == 2 )) && return 2
+        (( confirm_rc != 0 )) && return 0
     fi
     if PATH="$_CDW_PATH" git branch -d "$branch_name" 2>/dev/null; then
         echo "cdw: deleted branch '$branch_name'"
@@ -98,7 +101,18 @@ _cdw_create() {
     local main_path=$1
     local branch_name hook_cmd
     branch_name=$(_cdw_read_rc_key "$main_path" "branch_prefix")
+    typeset -g _cdw_vared_escaped=0
+    local prior_esc
+    prior_esc=$(bindkey '\e' 2>/dev/null | awk '{print $2}')
+    bindkey '\e' _cdw_vared_escape_widget
     vared -p "Branch name: " branch_name
+    if [[ -n $prior_esc ]]; then
+        bindkey '\e' "$prior_esc"
+    else
+        bindkey -r '\e'
+    fi
+
+    (( _cdw_vared_escaped )) && return 2
     [[ -z $branch_name ]] && return 0
     local derived_path="${main_path}/.worktrees/${branch_name//\//-}"
     mkdir -p "${main_path}/.worktrees"
