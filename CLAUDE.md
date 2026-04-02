@@ -8,11 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Running Tests
 
-```zsh
-zsh tests/test_cdw.zsh
-```
-
-All tests print `PASS: <test name>` on success. Any failure prints `FAIL: <test name> — expected: <x>  got: <y>` and exits 1.
+Do not write or execute tests in this repository.
 
 ## Architecture
 
@@ -29,10 +25,6 @@ All tests print `PASS: <test name>` on success. Any failure prints `FAIL: <test 
 - The sentinel item `[+ new worktree]` is detected by content comparison before key dispatch, not via `--expect`
 - `_cdw_create` derives the worktree path as `${main_path}/.worktrees/${branch_name//\//-}` — slashes in branch names become dashes
 - Adding a new key-bound action: write a `_cdw_<action>` handler, add one entry to `_cdw_handlers`, update the header string
-
-### Test harness pattern
-
-Tests source `cdw.zsh`, then override `git`, `fzf`, `cd`, and `command` as shell functions to return controlled output. Each test uses `unfunction` to restore the originals after. The `assert_eq` helper compares expected/actual and calls `pass`/`fail`.
 
 ## Commit Format
 

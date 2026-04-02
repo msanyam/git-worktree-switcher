@@ -14,11 +14,11 @@ _cdw_check_git() {
     fi
 }
 
-_cdw_read_hook() {
-    local config="$1/.cdwrc"
+_cdw_read_rc_key() {
+    local config="$1/.cdwrc" key="$2"
     [[ ! -f $config ]] && return 1
     local line
-    line=$(PATH="$_CDW_PATH" grep -m1 "^post_create=" "$config") || return 1
+    line=$(PATH="$_CDW_PATH" grep -m1 "^${key}=" "$config") || return 1
     print -r -- "${line#*=}"
 }
 
@@ -60,7 +60,7 @@ _cdw_delete() {
 _cdw_create() {
     local main_path=$1
     local branch_name hook_cmd
-    local branch_name="${GIT_BRANCH_PREFIX:+${GIT_BRANCH_PREFIX}}"
+    branch_name=$(_cdw_read_rc_key "$main_path" "branch_prefix")
     vared -p "Branch name: " branch_name
     [[ -z $branch_name ]] && return 0
     local derived_path="${main_path}/.worktrees/${branch_name//\//-}"
@@ -74,7 +74,7 @@ _cdw_create() {
         echo "cdw: could not cd into $derived_path"
         return 1
     fi
-    hook_cmd=$(_cdw_read_hook "$main_path")
+    hook_cmd=$(_cdw_read_rc_key "$main_path" "post_create")
     _cdw_run_hook "$hook_cmd" "$branch_name" "$derived_path"
 }
 
