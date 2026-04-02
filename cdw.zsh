@@ -14,6 +14,14 @@ _cdw_check_git() {
     fi
 }
 
+_cdw_read_hook() {
+    local config="$1/.cdwrc"
+    [[ ! -f $config ]] && return 1
+    local line
+    line=$(PATH="$_CDW_PATH" grep -m1 "^post_create=" "$config") || return 1
+    print -r -- "${line#*=}"
+}
+
 _cdw_cd() {
     local worktree_path=$1
     if [[ ! -d $worktree_path ]]; then
