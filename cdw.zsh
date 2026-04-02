@@ -56,6 +56,14 @@ _cdw_confirm() {
     fi
 }
 
+typeset -g _cdw_vared_escaped=0
+
+_cdw_vared_escape_widget() {
+    _cdw_vared_escaped=1
+    zle send-break
+}
+zle -N _cdw_vared_escape_widget
+
 _cdw_delete() {
     local worktree_path=$1 main_path=$2 branch_name=$3
     if [[ $worktree_path == "$main_path" ]]; then
