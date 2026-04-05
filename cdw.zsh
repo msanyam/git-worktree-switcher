@@ -56,6 +56,11 @@ _cdw_confirm() {
     fi
 }
 
+_cdw_erase_lines() {
+    local n=${1:-1}
+    repeat $n { printf '\033[1A\r\033[2K' }
+}
+
 typeset -g _cdw_vared_escaped=0
 
 _cdw_vared_escape_widget() {
@@ -66,30 +71,34 @@ zle -N _cdw_vared_escape_widget
 
 _cdw_delete() {
     local worktree_path=$1 main_path=$2 branch_name=$3
+    local confirms_printed=0
     if [[ $worktree_path == "$main_path" ]]; then
         echo "cdw: cannot delete the main worktree"
         return 1
     fi
     _cdw_confirm "Remove $worktree_path? [y/N] "
     local confirm_rc=$?
-    (( confirm_rc == 2 )) && return 2
-    (( confirm_rc != 0 )) && return 0
+    (( confirms_printed++ ))
+    (( confirm_rc == 2 )) && { _cdw_erase_lines $confirms_printed; return 2; }
+    (( confirm_rc != 0 )) && { _cdw_erase_lines $confirms_printed; return 0; }
     if ! PATH="$_CDW_PATH" git worktree remove "$worktree_path"; then
         echo "cdw: worktree has uncommitted changes; remove manually with: git worktree remove --force $worktree_path"
         return 1
     fi
-    [[ -z $branch_name ]] && return 0
+    [[ -z $branch_name ]] && { _cdw_erase_lines $confirms_printed; return 0; }
     local setting
     setting=$(_cdw_read_rc_key "delete_branch") || setting=ask
     [[ $setting != delete && $setting != skip && $setting != ask ]] && setting=ask
-    [[ $setting == skip ]] && return 0
+    [[ $setting == skip ]] && { _cdw_erase_lines $confirms_printed; return 0; }
     if [[ $setting == ask ]]; then
         _cdw_confirm "Also delete branch '$branch_name'? [y/N] "
         local confirm_rc=$?
-        (( confirm_rc == 2 )) && return 2
-        (( confirm_rc != 0 )) && return 0
+        (( confirms_printed++ ))
+        (( confirm_rc == 2 )) && { _cdw_erase_lines $confirms_printed; return 2; }
+        (( confirm_rc != 0 )) && { _cdw_erase_lines $confirms_printed; return 0; }
     fi
     if PATH="$_CDW_PATH" git branch -d "$branch_name" 2>/dev/null; then
+        _cdw_erase_lines $confirms_printed
         echo "cdw: deleted branch '$branch_name'"
     else
         echo "cdw: could not delete branch '$branch_name'"
