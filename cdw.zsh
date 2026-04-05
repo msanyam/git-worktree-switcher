@@ -60,7 +60,7 @@ typeset -g _cdw_vared_escaped=0
 
 _cdw_vared_escape_widget() {
     _cdw_vared_escaped=1
-    zle send-break
+    zle .send-break
 }
 zle -N _cdw_vared_escape_widget
 
@@ -103,7 +103,7 @@ _cdw_create() {
     branch_name=$(_cdw_read_rc_key "$main_path" "branch_prefix")
     typeset -g _cdw_vared_escaped=0
     local prior_esc
-    prior_esc=$(bindkey '\e' 2>/dev/null | awk '{print $2}')
+    prior_esc=$(bindkey '\e' 2>/dev/null | awk '{print $2}' | grep -v '^undefined-key$')
     bindkey '\e' _cdw_vared_escape_widget
     vared -p "Branch name: " branch_name
     if [[ -n $prior_esc ]]; then
@@ -145,8 +145,9 @@ _cdw_main() {
         return 1
     fi
 
+    local output key selected fzf_exit handler_rc worktree_path branch_raw branch_name
     while true; do
-        local output key selected fzf_exit
+        [[ -o xtrace ]] && print -u2 "[cdw] WARNING: xtrace is ON at loop top"
         output=$(
             { printf '[+ new worktree]\n'; PATH="$_CDW_PATH" git worktree list; } \
             | PATH="$_CDW_PATH" fzf \
@@ -170,17 +171,15 @@ _cdw_main() {
 
         [[ -z $selected || $selected == "$key" ]] && return 0
 
-        local handler_rc=0
+        handler_rc=0
 
         if [[ $selected == '[+ new worktree]' ]]; then
             [[ $key == 'bspace' ]] && return 0
             _cdw_create "$main_path"
             handler_rc=$?
         else
-            local worktree_path
             worktree_path=$(awk '{print $1}' <<< "$selected")
 
-            local branch_raw branch_name
             branch_raw=$(awk '{print $3}' <<< "$selected")
             if [[ $branch_raw == \(* || -z $branch_raw ]]; then
                 branch_name=''
