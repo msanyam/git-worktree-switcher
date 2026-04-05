@@ -88,7 +88,7 @@ _cdw_delete() {
     [[ -z $branch_name ]] && { _cdw_erase_lines $confirms_printed; return 0; }
     local setting
     setting=$(_cdw_read_rc_key "delete_branch") || setting=ask
-    [[ $setting != delete && $setting != skip && $setting != ask ]] && setting=ask
+    [[ $setting != always && $setting != skip && $setting != ask ]] && setting=ask
     [[ $setting == skip ]] && { _cdw_erase_lines $confirms_printed; return 0; }
     if [[ $setting == ask ]]; then
         _cdw_confirm "Also delete branch '$branch_name'? [y/N] "
