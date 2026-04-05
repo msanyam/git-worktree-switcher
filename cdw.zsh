@@ -15,7 +15,7 @@ _cdw_check_git() {
 }
 
 _cdw_read_rc_key() {
-    local config="$1/.cdwrc" key="$2"
+    local config="$HOME/.cdwrc" key="$1"
     [[ ! -f $config ]] && return 1
     local line
     line=$(PATH="$_CDW_PATH" grep -m1 "^${key}=" "$config") || return 1
@@ -80,7 +80,7 @@ _cdw_delete() {
     fi
     [[ -z $branch_name ]] && return 0
     local setting
-    setting=$(_cdw_read_rc_key "$main_path" "delete_branch") || setting=ask
+    setting=$(_cdw_read_rc_key "delete_branch") || setting=ask
     [[ $setting != delete && $setting != skip && $setting != ask ]] && setting=ask
     [[ $setting == skip ]] && return 0
     if [[ $setting == ask ]]; then
@@ -100,7 +100,7 @@ _cdw_delete() {
 _cdw_create() {
     local main_path=$1
     local branch_name hook_cmd
-    branch_name=$(_cdw_read_rc_key "$main_path" "branch_prefix")
+    branch_name=$(_cdw_read_rc_key "branch_prefix")
     typeset -g _cdw_vared_escaped=0
     local prior_esc
     prior_esc=$(bindkey '\e' 2>/dev/null | awk '{print $2}' | grep -v '^undefined-key$')
@@ -125,7 +125,7 @@ _cdw_create() {
         echo "cdw: could not cd into $derived_path"
         return 1
     fi
-    hook_cmd=$(_cdw_read_rc_key "$main_path" "post_create")
+    hook_cmd=$(_cdw_read_rc_key "post_create")
     _cdw_run_hook "$hook_cmd" "$branch_name" "$derived_path"
 }
 
