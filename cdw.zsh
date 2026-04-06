@@ -97,7 +97,7 @@ _cdw_delete() {
         (( confirm_rc == 2 )) && { _cdw_erase_lines $confirms_printed; return 2; }
         (( confirm_rc != 0 )) && { _cdw_erase_lines $confirms_printed; return 0; }
     fi
-    if PATH="$_CDW_PATH" git branch -d "$branch_name" 2>/dev/null; then
+    if PATH="$_CDW_PATH" git -C "$main_path" branch -d "$branch_name" 2>/dev/null; then
         _cdw_erase_lines $confirms_printed
         echo "cdw: deleted branch '$branch_name'"
     else
