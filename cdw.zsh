@@ -23,14 +23,17 @@ _cdw_read_rc_key() {
 }
 
 _cdw_run_hook() {
-    local hook_cmd=$1 branch=$2 worktree_path=$3
+    local hook_name=$1 hook_cmd=$2 branch=$3 worktree_path=$4
     [[ -z $hook_cmd ]] && return 0
     local rc
-    CDW_BRANCH="$branch" CDW_WORKTREE_PATH="$worktree_path" eval "$hook_cmd"
-    rc=$?
-    if (( rc != 0 )); then
-        echo "cdw: post_create hook failed (exit $rc)"
+    if [[ -n $branch ]]; then
+        CDW_BRANCH="$branch" CDW_WORKTREE_PATH="$worktree_path" eval "$hook_cmd"
+    else
+        CDW_WORKTREE_PATH="$worktree_path" eval "$hook_cmd"
     fi
+    rc=$?
+    (( rc != 0 )) && echo "cdw: ${hook_name} hook failed (exit $rc)"
+    return 0
 }
 
 _cdw_cd() {
@@ -39,7 +42,10 @@ _cdw_cd() {
         echo "cdw: path does not exist: $worktree_path"
         return 1
     fi
-    cd "$worktree_path"
+    cd "$worktree_path" || return 1
+    local hook_cmd
+    hook_cmd=$(_cdw_read_rc_key "post_selection")
+    _cdw_run_hook "post_selection" "$hook_cmd" "" "$worktree_path"
 }
 
 _cdw_confirm() {
@@ -82,8 +88,15 @@ _cdw_delete() {
     (( confirm_rc == 2 )) && { _cdw_erase_lines $confirms_printed; return 2; }
     (( confirm_rc != 0 )) && { _cdw_erase_lines $confirms_printed; return 0; }
     if ! PATH="$_CDW_PATH" git worktree remove "$worktree_path"; then
-        echo "cdw: worktree has uncommitted changes; remove manually with: git worktree remove --force $worktree_path"
-        return 1
+        _cdw_confirm "Worktree has uncommitted or untracked changes. Force remove? [y/N] "
+        confirm_rc=$?
+        (( confirms_printed++ ))
+        (( confirm_rc == 2 )) && { _cdw_erase_lines $confirms_printed; return 2; }
+        (( confirm_rc != 0 )) && { _cdw_erase_lines $confirms_printed; return 0; }
+        if ! PATH="$_CDW_PATH" git worktree remove --force "$worktree_path"; then
+            echo "cdw: failed to force-remove worktree '$worktree_path'"
+            return 1
+        fi
     fi
     [[ -z $branch_name ]] && { _cdw_erase_lines $confirms_printed; return 0; }
     local setting
@@ -104,6 +117,29 @@ _cdw_delete() {
         echo "cdw: could not delete branch '$branch_name'"
         echo "cdw: to force-delete: git branch -D $branch_name"
     fi
+}
+
+_cdw_init_submodule_worktrees() {
+    local worktree_path=$1 depth=${2:-0}
+    [[ $depth -ge 2 ]] && return 0
+    [[ ! -f "${worktree_path}/.gitmodules" ]] && return 0
+
+    local common_dir submodule_path submodule_gitdir
+    common_dir=$(PATH="$_CDW_PATH" git -C "$worktree_path" rev-parse --git-common-dir 2>/dev/null)
+    [[ -n $common_dir && $common_dir != /* ]] && common_dir="${worktree_path}/${common_dir}"
+    while IFS= read -r submodule_path; do
+        [[ -z $submodule_path ]] && continue
+        submodule_gitdir="${common_dir}/modules/${submodule_path}"
+        if [[ -z $common_dir || ! -d $submodule_gitdir ]]; then
+            echo "cdw: skipping submodule '${submodule_path}': not initialized in main worktree"
+            continue
+        fi
+        if ! PATH="$_CDW_PATH" git -C "$submodule_gitdir" worktree add "${worktree_path}/${submodule_path}" HEAD 2>/dev/null; then
+            echo "cdw: warning: could not create worktree for submodule '${submodule_path}'"
+            continue
+        fi
+        _cdw_init_submodule_worktrees "${worktree_path}/${submodule_path}" $(( depth + 1 ))
+    done < <(PATH="$_CDW_PATH" git -C "$worktree_path" config --file .gitmodules --get-regexp 'submodule\..*\.path' 2>/dev/null | awk '{print $2}')
 }
 
 _cdw_create() {
@@ -130,12 +166,16 @@ _cdw_create() {
         echo "cdw: if '$branch_name' already exists, use: git worktree add $derived_path $branch_name"
         return 1
     fi
+    if [[ -f "${derived_path}/.gitmodules" ]]; then
+        echo "cdw: initializing submodule worktrees..."
+        _cdw_init_submodule_worktrees "$derived_path"
+    fi
     if ! cd "$derived_path"; then
         echo "cdw: could not cd into $derived_path"
         return 1
     fi
     hook_cmd=$(_cdw_read_rc_key "post_create")
-    _cdw_run_hook "$hook_cmd" "$branch_name" "$derived_path"
+    _cdw_run_hook "post_create" "$hook_cmd" "$branch_name" "$derived_path"
 }
 
 typeset -gA _cdw_handlers

@@ -13,10 +13,12 @@ https://github.com/user-attachments/assets/36807d45-ed0e-4c13-b9d2-ee9779192a6a
 - **Delete worktrees** — press Backspace on any worktree to remove it (with confirmation prompt)
 - **Delete branch on worktree removal** — optionally delete the linked branch when removing a worktree (configurable via `.cdwrc`)
 - **Protected main worktree** — the main worktree can never be deleted
-- **Uncommitted-change safety** — refuses to delete a worktree with uncommitted changes and prints the manual override command
+- **Uncommitted-change safety** — prompts for force-remove confirmation when a worktree has uncommitted or untracked changes
 - **Escape to reopen** — pressing Escape in the fzf picker reopens it instead of exiting `cdw`
 - **Post-create hook** — run a shell command automatically after creating a new worktree (e.g. install dependencies)
-- **`.cdwrc` config file** — configure branch prefix, post-create hook, and branch deletion behavior
+- **Post-selection hook** — run a shell command automatically after switching to a worktree (e.g. activate an env)
+- **Submodule worktree init** — automatically creates linked worktrees for all submodules when creating a new worktree
+- **`.cdwrc` config file** — configure branch prefix, hooks, and branch deletion behavior
 - **Homebrew fzf support** — `/opt/homebrew/bin` is always in PATH so fzf works on Apple Silicon without extra shell config
 
 ## Requirements
@@ -27,21 +29,23 @@ https://github.com/user-attachments/assets/36807d45-ed0e-4c13-b9d2-ee9779192a6a
 
 ## Installation
 
-### Makefile (recommended)
+### install.sh (recommended)
 
 ```zsh
-make install
+./install.sh
 ```
 
-This symlinks `.cdwrc` to `~/.cdwrc` and adds a `source` line for `cdw.zsh` to your `~/.zshrc`. Restart your shell or run `source ~/.zshrc` afterwards.
+This creates a symlink `~/.local/bin/cdw` → `cdw.zsh` and adds a `source` line to `~/.zshrc`. Restart your shell or run `source ~/.zshrc` afterwards. Because the symlink points into the repo, `git pull` automatically picks up updates — no reinstall needed.
 
-To uninstall:
+The repo must stay in its installed location. If you move it, run `./install.sh uninstall && ./install.sh` to update the symlink.
+
+To uninstall (removes the symlink and the `~/.zshrc` entry automatically):
 
 ```zsh
-make uninstall
+./install.sh uninstall
 ```
 
-This removes the `~/.cdwrc` symlink (with confirmation) and prints the lines to manually remove from `~/.zshrc`.
+`make install` / `make uninstall` are also available as aliases.
 
 ### Manual
 
@@ -80,6 +84,7 @@ cdw
 |-----|--------|---------|-------------|
 | `branch_prefix` | any string | _(empty)_ | Pre-fills the branch name input when creating a worktree |
 | `post_create` | shell command | _(empty)_ | Runs after a new worktree is created; receives `CDW_BRANCH` and `CDW_WORKTREE_PATH` as env vars |
+| `post_selection` | shell command | _(empty)_ | Runs after switching to a worktree; receives `CDW_WORKTREE_PATH` as an env var |
 | `delete_branch` | `ask`, `always`, `skip` | `ask` | Controls branch deletion when removing a worktree |
 
 ### Branch prefix
@@ -109,7 +114,24 @@ The hook receives two environment variables:
 
 If the hook exits non-zero, `cdw` prints a warning but does not abort.
 
+### Post-selection hook
+
+Run a command automatically after switching into a worktree:
+
+```ini
+# ~/.cdwrc
+post_selection=. .venv/bin/activate
+```
+
+The hook receives one environment variable:
+
+- `CDW_WORKTREE_PATH` — the absolute path of the selected worktree
+
+If the hook exits non-zero, `cdw` prints a warning but does not abort.
+
 ### Branch deletion on worktree removal
+
+When deleting a worktree that has uncommitted or untracked changes, `cdw` prompts for confirmation before running `git worktree remove --force`.
 
 Control what happens to the branch when you delete a worktree:
 
