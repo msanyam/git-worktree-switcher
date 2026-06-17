@@ -17,7 +17,7 @@ https://github.com/user-attachments/assets/36807d45-ed0e-4c13-b9d2-ee9779192a6a
 - **Escape to reopen** — pressing Escape in the fzf picker reopens it instead of exiting `cdw`
 - **Post-create hook** — run a shell command automatically after creating a new worktree (e.g. install dependencies)
 - **Post-selection hook** — run a shell command automatically after switching to a worktree (e.g. activate an env)
-- **Submodule worktree init** — automatically creates linked worktrees for all submodules when creating a new worktree
+- **Submodule worktree init** — automatically creates linked worktrees for all submodules when creating a new worktree; concurrent-safe (flock), validated, with per-submodule rollback and stale-registration pruning on delete
 - **`.cdwrc` config file** — configure branch prefix, hooks, and branch deletion behavior
 - **Homebrew fzf support** — `/opt/homebrew/bin` is always in PATH so fzf works on Apple Silicon without extra shell config
 
@@ -145,3 +145,15 @@ delete_branch=skip    # never delete the branch
 ### Worktree location
 
 New worktrees are created at `<main-repo-path>/.worktrees/<branch-name>` (slashes in branch names are converted to dashes).
+
+## Submodule support
+
+When you create a worktree in a repo that has submodules, `cdw` automatically initializes each submodule as a *linked worktree* of the main checkout's submodule repo — sharing the object store and refs instead of re-cloning.
+
+- **Concurrent-safe** — a `zsystem flock`-based lock (no external binary) serialises init across all worktrees and parallel `cdw` runs of the same superproject, preventing gitdir-collision corruption.
+- **Validated** — checks the submodule store is a healthy repo, the submodule is initialized in the main checkout, and the pinned commit exists locally; fails loudly instead of silently producing a broken state.
+- **`extensions.worktreeConfig` enabled automatically** — prevents `core.worktree` from being written to the shared config (which would clobber the existing checkout's value). Any pre-existing shared `core.worktree` is migrated to the main worktree's `config.worktree` transparently.
+- **No network** — strictly local; never fetches from a remote. Run `git submodule update --init` in the main checkout first.
+- **Per-submodule rollback** — if a submodule fails, it's rolled back cleanly; other submodules and the parent worktree are unaffected.
+- **Progress summary** — prints `cdw: initialized X of Y submodules` after each create.
+- **Clean delete** — stale submodule worktree registrations are pruned automatically when the parent worktree is removed.
