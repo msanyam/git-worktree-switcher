@@ -117,8 +117,20 @@ _cdw_delete() {
         _cdw_erase_lines $confirms_printed
         echo "cdw: deleted branch '$branch_name'"
     else
-        echo "cdw: could not delete branch '$branch_name'"
-        echo "cdw: to force-delete: git branch -D $branch_name"
+        echo "cdw: could not delete branch '$branch_name' (not fully merged)"
+        _cdw_confirm "Force delete '$branch_name'? [y/N] "
+        local force_rc=$?
+        (( confirms_printed++ ))
+        if (( force_rc == 0 )); then
+            if PATH="$_CDW_PATH" git -C "$main_path" branch -D "$branch_name" 2>/dev/null; then
+                _cdw_erase_lines $confirms_printed
+                echo "cdw: force-deleted branch '$branch_name'"
+            else
+                echo "cdw: could not force-delete branch '$branch_name'"
+            fi
+        else
+            _cdw_erase_lines $confirms_printed
+        fi
     fi
 }
 
