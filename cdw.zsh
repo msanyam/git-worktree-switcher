@@ -119,6 +119,16 @@ _cdw_delete() {
     fi
 }
 
+_cdw_cmd_init_submodules() {
+    _cdw_check_git || return 1
+    if [[ ! -f "${PWD}/.gitmodules" ]]; then
+        echo "cdw: no submodules found"
+        return 0
+    fi
+    echo "cdw: initializing submodule worktrees..."
+    _cdw_init_submodule_worktrees "$PWD"
+}
+
 _cdw_init_submodule_worktrees() {
     local worktree_path=$1 depth=${2:-0}
     [[ $depth -ge 2 ]] && return 0
@@ -255,6 +265,10 @@ _cdw_main() {
 }
 
 cdw() {
+    if [[ $1 == init-submodules ]]; then
+        _cdw_cmd_init_submodules
+        return $?
+    fi
     local _cdw_xt=0
     [[ -o xtrace ]] && _cdw_xt=1 && set +x
     _cdw_main "$@"
