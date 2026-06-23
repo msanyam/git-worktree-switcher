@@ -131,7 +131,11 @@ _cdw_init_submodule_worktrees() {
         [[ -z $submodule_path ]] && continue
         submodule_gitdir="${common_dir}/modules/${submodule_path}"
         if [[ -z $common_dir || ! -d $submodule_gitdir ]]; then
-            echo "cdw: skipping submodule '${submodule_path}': not initialized in main worktree"
+            echo "cdw: skipping submodule '${submodule_path}': run 'git submodule update --init' in the main worktree first"
+            continue
+        fi
+        if [[ -d "${worktree_path}/${submodule_path}" ]]; then
+            echo "cdw: submodule '${submodule_path}': already initialized, skipping"
             continue
         fi
         if ! PATH="$_CDW_PATH" git -C "$submodule_gitdir" worktree add "${worktree_path}/${submodule_path}" HEAD 2>/dev/null; then
