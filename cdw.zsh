@@ -134,6 +134,16 @@ _cdw_delete() {
     fi
 }
 
+_cdw_cmd_init_submodules() {
+    _cdw_check_git || return 1
+    if [[ ! -f "${PWD}/.gitmodules" ]]; then
+        echo "cdw: no submodules found"
+        return 0
+    fi
+    echo "cdw: initializing submodule worktrees..."
+    _cdw_init_submodule_worktrees "$PWD"
+}
+
 # Serialize submodule-worktree init across all worktrees and concurrent cdw
 # runs of the same superproject. Without this, parallel `git worktree add`
 # calls race on the auto-allocated worktrees/<name> directory and can produce
@@ -289,6 +299,11 @@ _cdw_add_submodule_worktrees() {
         gitlink=$(PATH="$_CDW_PATH" git -C "$worktree_path" rev-parse "HEAD:${submodule_path}" 2>/dev/null)
         [[ -z $gitlink ]] && gitlink=HEAD
 
+        if [[ -d "$checkout" ]]; then
+            echo "cdw: submodule '${submodule_path}': already initialized, skipping"
+            continue
+        fi
+
         if ! err=$(_cdw_validate_submodule_store "$submodule_gitdir" "$main_path" "$submodule_path" "$gitlink"); then
             echo "cdw: submodule '${submodule_path}' failed: ${err}"
             _cdw_sm_failed+=("$submodule_path")
@@ -443,6 +458,10 @@ _cdw_main() {
 }
 
 cdw() {
+    if [[ $1 == init-submodules ]]; then
+        _cdw_cmd_init_submodules
+        return $?
+    fi
     local _cdw_xt=0
     [[ -o xtrace ]] && _cdw_xt=1 && set +x
     _cdw_main "$@"
