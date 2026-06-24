@@ -1,3 +1,4 @@
+#!/usr/bin/env zsh
 _CDW_PATH="/opt/homebrew/bin:/usr/bin:/bin:$PATH"
 
 _cdw_check_fzf() {
@@ -73,7 +74,7 @@ _cdw_vared_escape_widget() {
     _cdw_vared_escaped=1
     zle .send-break
 }
-zle -N _cdw_vared_escape_widget
+[[ -o zle ]] && zle -N _cdw_vared_escape_widget
 
 _cdw_delete() {
     local worktree_path=$1 main_path=$2 branch_name=$3
