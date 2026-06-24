@@ -299,7 +299,7 @@ _cdw_add_submodule_worktrees() {
         gitlink=$(PATH="$_CDW_PATH" git -C "$worktree_path" rev-parse "HEAD:${submodule_path}" 2>/dev/null)
         [[ -z $gitlink ]] && gitlink=HEAD
 
-        if [[ -d "$checkout" ]]; then
+        if [[ -f "${checkout}/.git" ]]; then
             echo "cdw: submodule '${submodule_path}': already initialized, skipping"
             continue
         fi
