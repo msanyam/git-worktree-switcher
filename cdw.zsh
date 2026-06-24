@@ -471,3 +471,15 @@ cdw() {
     return $rc
 }
 
+if [[ $ZSH_EVAL_CONTEXT == toplevel ]]; then
+    case "${1:-}" in
+        init-submodules)
+            _cdw_cmd_init_submodules
+            exit $?
+            ;;
+        *)
+            print "usage: cdw <subcommand>\n\nsubcommands:\n  init-submodules   initialize submodule worktrees for the current directory" >&2
+            exit 1
+            ;;
+    esac
+fi
