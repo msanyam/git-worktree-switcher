@@ -353,6 +353,7 @@ _cdw_prune_submodule_worktrees() {
 _cdw_cmd_delete_submodules() {
     local force=0
     [[ ${1:-} == --force ]] && force=1
+    [[ -n ${1:-} && ${1:-} != --force ]] && { echo "cdw: unknown option '${1}'"; return 1; }
     _cdw_check_git || return 1
     if [[ ! -f "${PWD}/.gitmodules" ]]; then
         echo "cdw: no submodules found"
@@ -402,6 +403,7 @@ _cdw_remove_submodule_worktrees() {
 
         if [[ ! -f "${checkout}/.git" ]]; then
             echo "cdw: submodule '${submodule_path}': not initialized, skipping"
+            [[ -d $submodule_gitdir ]] && PATH="$_CDW_PATH" git -C "$submodule_gitdir" worktree prune 2>/dev/null
             continue
         fi
 
