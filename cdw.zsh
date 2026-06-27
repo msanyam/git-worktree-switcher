@@ -350,6 +350,83 @@ _cdw_prune_submodule_worktrees() {
     done
 }
 
+_cdw_cmd_delete_submodules() {
+    local force=0
+    [[ ${1:-} == --force ]] && force=1
+    _cdw_check_git || return 1
+    if [[ ! -f "${PWD}/.gitmodules" ]]; then
+        echo "cdw: no submodules found"
+        return 0
+    fi
+    echo "cdw: removing submodule worktrees..."
+    _cdw_delete_submodule_worktrees "$PWD" $force
+}
+
+_cdw_delete_submodule_worktrees() {
+    local worktree_path=$1 force=${2:-0} common_dir main_path
+    [[ ! -f "${worktree_path}/.gitmodules" ]] && return 0
+    common_dir=$(PATH="$_CDW_PATH" git -C "$worktree_path" rev-parse --git-common-dir 2>/dev/null)
+    [[ -n $common_dir && $common_dir != /* ]] && common_dir="${worktree_path}/${common_dir}"
+    if [[ -z $common_dir ]]; then
+        echo "cdw: could not determine git common dir; skipping submodule delete"
+        return 1
+    fi
+    main_path="${common_dir:h}"
+    if [[ $worktree_path == "$main_path" ]]; then
+        echo "cdw: cannot delete submodule worktrees from the main checkout"
+        return 1
+    fi
+    _cdw_sm_ok=0
+    _cdw_sm_failed=()
+    _cdw_with_submodule_lock "$common_dir" _cdw_remove_submodule_worktrees "$worktree_path" $force 0
+    local rc=$?
+    local total=$(( _cdw_sm_ok + ${#_cdw_sm_failed[@]} ))
+    echo "cdw: removed ${_cdw_sm_ok} of ${total} submodule worktrees"
+    (( ${#_cdw_sm_failed[@]} )) && echo "cdw: failed: ${_cdw_sm_failed[*]}"
+    return $rc
+}
+
+_cdw_remove_submodule_worktrees() {
+    local worktree_path=$1 force=${2:-0} depth=${3:-0}
+    [[ $depth -ge 2 ]] && return 0
+    [[ ! -f "${worktree_path}/.gitmodules" ]] && return 0
+
+    local common_dir submodule_path submodule_gitdir checkout
+    common_dir=$(PATH="$_CDW_PATH" git -C "$worktree_path" rev-parse --git-common-dir 2>/dev/null)
+    [[ -n $common_dir && $common_dir != /* ]] && common_dir="${worktree_path}/${common_dir}"
+
+    while IFS= read -r submodule_path; do
+        [[ -z $submodule_path ]] && continue
+        submodule_gitdir="${common_dir}/modules/${submodule_path}"
+        checkout="${worktree_path}/${submodule_path}"
+
+        if [[ ! -f "${checkout}/.git" ]]; then
+            echo "cdw: submodule '${submodule_path}': not initialized, skipping"
+            continue
+        fi
+
+        _cdw_remove_submodule_worktrees "$checkout" $force $(( depth + 1 ))
+
+        if PATH="$_CDW_PATH" git -C "$submodule_gitdir" worktree remove "$checkout" 2>/dev/null; then
+            :
+        elif (( force )); then
+            if ! PATH="$_CDW_PATH" git -C "$submodule_gitdir" worktree remove --force "$checkout" 2>/dev/null; then
+                echo "cdw: submodule '${submodule_path}': failed to force-remove worktree"
+                _cdw_sm_failed+=("$submodule_path")
+                continue
+            fi
+        else
+            echo "cdw: submodule '${submodule_path}': has uncommitted changes; use --force to override"
+            _cdw_sm_failed+=("$submodule_path")
+            continue
+        fi
+
+        [[ -d $checkout ]] && rm -rf "$checkout"
+        PATH="$_CDW_PATH" git -C "$submodule_gitdir" worktree prune 2>/dev/null
+        (( _cdw_sm_ok++ ))
+    done < <(PATH="$_CDW_PATH" git -C "$worktree_path" config --file .gitmodules --get-regexp 'submodule\..*\.path' 2>/dev/null | awk '{print $2}')
+}
+
 _cdw_create() {
     local main_path=$1
     local branch_name hook_cmd
