@@ -540,6 +540,10 @@ cdw() {
         _cdw_cmd_init_submodules
         return $?
     fi
+    if [[ $1 == delete-submodules ]]; then
+        _cdw_cmd_delete_submodules "${@:2}"
+        return $?
+    fi
     local _cdw_xt=0
     [[ -o xtrace ]] && _cdw_xt=1 && set +x
     _cdw_main "$@"
@@ -554,8 +558,12 @@ if [[ $ZSH_EVAL_CONTEXT == toplevel ]]; then
             _cdw_cmd_init_submodules
             exit $?
             ;;
+        delete-submodules)
+            _cdw_cmd_delete_submodules "${@:2}"
+            exit $?
+            ;;
         *)
-            print "usage: cdw <subcommand>\n\nsubcommands:\n  init-submodules   initialize submodule worktrees for the current directory" >&2
+            print "usage: cdw <subcommand>\n\nsubcommands:\n  init-submodules     initialize submodule worktrees for the current directory\n  delete-submodules   remove submodule worktrees for the current directory" >&2
             exit 1
             ;;
     esac
