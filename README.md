@@ -18,6 +18,7 @@ https://github.com/user-attachments/assets/36807d45-ed0e-4c13-b9d2-ee9779192a6a
 - **Post-create hook** — run a shell command automatically after creating a new worktree (e.g. install dependencies)
 - **Post-selection hook** — run a shell command automatically after switching to a worktree (e.g. activate an env)
 - **Submodule worktree init** — automatically creates linked worktrees for all submodules when creating a new worktree; concurrent-safe (flock), validated, with per-submodule rollback and stale-registration pruning on delete
+- **Submodule worktree delete** — `cdw delete-submodules [--force]` removes all submodule linked worktrees from the current worktree, pruning stale registrations; the explicit inverse of init
 - **`.cdwrc` config file** — configure branch prefix, hooks, and branch deletion behavior
 - **Homebrew fzf support** — `/opt/homebrew/bin` is always in PATH so fzf works on Apple Silicon without extra shell config
 
@@ -157,3 +158,15 @@ When you create a worktree in a repo that has submodules, `cdw` automatically in
 - **Per-submodule rollback** — if a submodule fails, it's rolled back cleanly; other submodules and the parent worktree are unaffected.
 - **Progress summary** — prints `cdw: initialized X of Y submodules` after each create.
 - **Clean delete** — stale submodule worktree registrations are pruned automatically when the parent worktree is removed.
+
+### Subcommands
+
+Both operations are also available as standalone subcommands (useful for scripting or re-running after a partial failure):
+
+```zsh
+cdw init-submodules            # initialize submodule worktrees in $PWD
+cdw delete-submodules          # remove submodule worktrees from $PWD
+cdw delete-submodules --force  # force-remove even with uncommitted changes
+```
+
+`delete-submodules` is the explicit inverse of `init-submodules`: it removes only the submodule linked worktrees within the current worktree and prunes any stale registrations, leaving the parent worktree itself intact. It refuses to run from the main worktree.

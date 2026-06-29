@@ -26,6 +26,18 @@ Do not write or execute tests in this repository.
 - `_cdw_create` derives the worktree path as `${main_path}/.worktrees/${branch_name//\//-}` — slashes in branch names become dashes
 - Adding a new key-bound action: write a `_cdw_<action>` handler, add one entry to `_cdw_handlers`, update the header string
 
+### Submodule subsystem
+
+`cdw init-submodules` and `cdw delete-submodules` are non-interactive subcommands dispatched from `cdw()` before the fzf loop. Each has a three-layer stack:
+
+| Layer | init | delete |
+|---|---|---|
+| Entry (CLI dispatch) | `_cdw_cmd_init_submodules` | `_cdw_cmd_delete_submodules([--force])` |
+| Lock + summary | `_cdw_init_submodule_worktrees` | `_cdw_delete_submodule_worktrees` |
+| Recursive worker | `_cdw_add_submodule_worktrees` | `_cdw_remove_submodule_worktrees` |
+
+Both stacks use `_cdw_with_submodule_lock` (flock on `$common_dir/cdw-submodules.lock`), the `_cdw_sm_ok` / `_cdw_sm_failed` globals, and a depth cap of 2 for nested submodules. Delete is depth-first (children removed before parents). `_cdw_rollback_submodule` is error-recovery only — not called by delete. Adding a new subcommand: add a branch in `cdw()` and a matching `case` entry in the script-mode block at the bottom of `cdw.zsh`.
+
 ## Commit Format
 
 `[cdw] :<gitmoji>: <short description>` — no attribution line. See existing commits for examples.
