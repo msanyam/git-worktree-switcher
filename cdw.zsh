@@ -249,6 +249,22 @@ _cdw_enable_submodule_worktree_config() {
     PATH="$_CDW_PATH" git config --file "$shared" extensions.worktreeConfig true 2>/dev/null
 }
 
+# Path of the main checkout that owns a git common dir. For a superproject that
+# is the parent of its `.git` dir; for a submodule (run from inside one, e.g.
+# `cdw init-submodules` in B) the common dir is `<super>/.git/modules/<path>`,
+# whose main checkout is recorded in core.worktree (relative to the gitdir).
+# arg: <common_dir> (absolute)
+_cdw_main_checkout() {
+    local common_dir=$1 wt
+    wt=$(PATH="$_CDW_PATH" git -C "$common_dir" config --get core.worktree 2>/dev/null)
+    if [[ -z $wt ]]; then
+        print -r -- "${common_dir:h}"
+        return
+    fi
+    [[ $wt != /* ]] && wt="${common_dir}/${wt}"
+    print -r -- "${wt:A}"
+}
+
 # Submodule-init run summary counters (set by the entry point, accumulated by
 # the recursive worker — both run in the current shell, so globals persist).
 typeset -g _cdw_sm_ok=0
@@ -268,7 +284,7 @@ _cdw_init_submodule_worktrees() {
         echo "cdw: could not determine git common dir; skipping submodule init"
         return 1
     fi
-    main_path="${common_dir:h}"
+    main_path=$(_cdw_main_checkout "$common_dir")
     _cdw_sm_ok=0
     _cdw_sm_failed=()
     _cdw_with_submodule_lock "$common_dir" _cdw_add_submodule_worktrees "$worktree_path" "$main_path" 0
@@ -300,8 +316,12 @@ _cdw_add_submodule_worktrees() {
         gitlink=$(PATH="$_CDW_PATH" git -C "$worktree_path" rev-parse "HEAD:${submodule_path}" 2>/dev/null)
         [[ -z $gitlink ]] && gitlink=HEAD
 
+        # Already initialized: don't re-add it, but still descend — its own
+        # submodules may be missing (e.g. an earlier run was interrupted or only
+        # B was set up), and idempotent reruns must repair them.
         if [[ -f "${checkout}/.git" ]]; then
-            echo "cdw: submodule '${submodule_path}': already initialized, skipping"
+            echo "cdw: submodule '${submodule_path}': already initialized, checking nested submodules"
+            _cdw_add_submodule_worktrees "$checkout" "${main_path}/${submodule_path}" $(( depth + 1 ))
             continue
         fi
 
