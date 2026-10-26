@@ -290,7 +290,11 @@ _cdw_init_submodule_worktrees() {
     _cdw_with_submodule_lock "$common_dir" _cdw_add_submodule_worktrees "$worktree_path" "$main_path" 0
     local rc=$?
     local total=$(( _cdw_sm_ok + ${#_cdw_sm_failed[@]} ))
-    echo "cdw: initialized ${_cdw_sm_ok} of ${total} submodules"
+    if (( total == 0 )); then
+        echo "cdw: all submodules already initialized"
+    else
+        echo "cdw: initialized ${_cdw_sm_ok} of ${total} submodules"
+    fi
     (( ${#_cdw_sm_failed[@]} )) && echo "cdw: failed: ${_cdw_sm_failed[*]}"
     return $rc
 }
@@ -301,16 +305,17 @@ _cdw_init_submodule_worktrees() {
 # submodule and continue. Recurses one level for nested submodules (depth cap
 # 2). Detached HEAD avoids "branch already checked out in another worktree".
 _cdw_add_submodule_worktrees() {
-    local worktree_path=$1 main_path=$2 depth=${3:-0}
+    local worktree_path=$1 main_path=$2 depth=${3:-0} prefix=${4:-}
     [[ $depth -ge 2 ]] && return 0
     [[ ! -f "${worktree_path}/.gitmodules" ]] && return 0
 
-    local common_dir submodule_path submodule_gitdir gitlink checkout err add_err
+    local common_dir submodule_path display submodule_gitdir gitlink checkout err add_err
     common_dir=$(PATH="$_CDW_PATH" git -C "$worktree_path" rev-parse --git-common-dir 2>/dev/null)
     [[ -n $common_dir && $common_dir != /* ]] && common_dir="${worktree_path}/${common_dir}"
 
     while IFS= read -r submodule_path; do
         [[ -z $submodule_path ]] && continue
+        display="${prefix}${submodule_path}"
         submodule_gitdir="${common_dir}/modules/${submodule_path}"
         checkout="${worktree_path}/${submodule_path}"
         gitlink=$(PATH="$_CDW_PATH" git -C "$worktree_path" rev-parse "HEAD:${submodule_path}" 2>/dev/null)
@@ -320,36 +325,37 @@ _cdw_add_submodule_worktrees() {
         # submodules may be missing (e.g. an earlier run was interrupted or only
         # B was set up), and idempotent reruns must repair them.
         if [[ -f "${checkout}/.git" ]]; then
-            echo "cdw: submodule '${submodule_path}': already initialized, checking nested submodules"
-            _cdw_add_submodule_worktrees "$checkout" "${main_path}/${submodule_path}" $(( depth + 1 ))
+            echo "cdw: submodule '${display}': already initialized, checking nested submodules"
+            _cdw_add_submodule_worktrees "$checkout" "${main_path}/${submodule_path}" $(( depth + 1 )) "${display}/"
             continue
         fi
 
         if ! err=$(_cdw_validate_submodule_store "$submodule_gitdir" "$main_path" "$submodule_path" "$gitlink"); then
-            echo "cdw: submodule '${submodule_path}' failed: ${err}"
-            _cdw_sm_failed+=("$submodule_path")
+            echo "cdw: submodule '${display}' failed: ${err}"
+            _cdw_sm_failed+=("$display")
             continue
         fi
 
         _cdw_enable_submodule_worktree_config "$submodule_gitdir"
 
         if ! add_err=$(PATH="$_CDW_PATH" git -C "$submodule_gitdir" worktree add --detach "$checkout" "$gitlink" 2>&1); then
-            echo "cdw: submodule '${submodule_path}' failed: worktree add error:"
+            echo "cdw: submodule '${display}' failed: worktree add error:"
             print -r -- "$add_err" | sed 's/^/cdw:   /'
             _cdw_rollback_submodule "$submodule_gitdir" "$checkout"
-            _cdw_sm_failed+=("$submodule_path")
+            _cdw_sm_failed+=("$display")
             continue
         fi
 
         if ! _cdw_check_worktree_backlink "$checkout"; then
-            echo "cdw: submodule '${submodule_path}' failed: gitdir backlink mismatch (concurrent collision)"
+            echo "cdw: submodule '${display}' failed: gitdir backlink mismatch (concurrent collision)"
             _cdw_rollback_submodule "$submodule_gitdir" "$checkout"
-            _cdw_sm_failed+=("$submodule_path")
+            _cdw_sm_failed+=("$display")
             continue
         fi
 
+        echo "cdw: submodule '${display}': initialized"
         (( _cdw_sm_ok++ ))
-        _cdw_add_submodule_worktrees "$checkout" "${main_path}/${submodule_path}" $(( depth + 1 ))
+        _cdw_add_submodule_worktrees "$checkout" "${main_path}/${submodule_path}" $(( depth + 1 )) "${display}/"
     done < <(PATH="$_CDW_PATH" git -C "$worktree_path" config --file .gitmodules --get-regexp 'submodule\..*\.path' 2>/dev/null | awk '{print $2}')
 }
 
